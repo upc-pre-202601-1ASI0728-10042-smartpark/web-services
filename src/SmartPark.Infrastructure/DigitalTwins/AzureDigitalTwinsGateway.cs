@@ -86,10 +86,32 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
         return result;
     }
 
-    public Task UpdateSmokeStateAsync(string detectorId, double smokeLevel, DateTimeOffset at, CancellationToken ct = default)
-        => Task.CompletedTask; // JSON Patch — implementado en el siguiente commit
+    public async Task UpdateSmokeStateAsync(string detectorId, double smokeLevel, DateTimeOffset at, CancellationToken ct = default)
+    {
+        // Aplica JSON Patch al twin del detector (idempotente).
+        var patch = new JsonPatchDocument();
+        patch.AppendReplace("/smokeDetected", true);
+        patch.AppendReplace("/smokeLevel", smokeLevel);
+        patch.AppendReplace("/status", "Alert");
+        patch.AppendReplace("/lastReading", at.UtcDateTime);
+        await _client.UpdateDigitalTwinAsync(detectorId, patch, cancellationToken: ct);
+        _log.LogWarning("Estado de humo actualizado en {Detector}: {Level} ppm", detectorId, smokeLevel);
+    }
 
-    public Task<bool> IsHealthyAsync(CancellationToken ct = default) => Task.FromResult(true);
+    public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await foreach (var _ in _client.QueryAsync<BasicDigitalTwin>("SELECT TOP(1) * FROM digitaltwins", ct))
+                return true;
+            return true;
+        }
+        catch (RequestFailedException ex)
+        {
+            _log.LogError(ex, "ADT no disponible (modo degradado)");
+            return false;
+        }
+    }
 
     // ---- helpers ----
     private static int ParseLevel(string id)
