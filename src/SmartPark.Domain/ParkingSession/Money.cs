@@ -13,7 +13,7 @@ public sealed class Money : ValueObject
     public static Money Of(decimal amount, string currency = "PEN")
     {
         if (amount < 0) throw new DomainException("El monto no puede ser negativo.");
-        return new Money(decimal.Round(amount, 2), currency);
+        return new Money(decimal.Round(amount, 2, MidpointRounding.AwayFromZero), currency);
     }
 
     public static Money Zero(string currency = "PEN") => new(0, currency);
