@@ -48,9 +48,15 @@ public static class DependencyInjection
         // "Adt:Mode = Demo" usa un grafo sembrado (entornos sin ADT real).
         services.Configure<AdtOptions>(config.GetSection("Adt"));
         if (string.Equals(config["Adt:Mode"], "Demo", StringComparison.OrdinalIgnoreCase))
-            services.AddSingleton<IDigitalTwinGateway, DemoDigitalTwinGateway>();
+        {
+            services.AddSingleton<DemoDigitalTwinGateway>();
+            services.AddSingleton<IDigitalTwinGateway>(sp => sp.GetRequiredService<DemoDigitalTwinGateway>());
+            services.AddSingleton<IOccupancySimulator>(sp => sp.GetRequiredService<DemoDigitalTwinGateway>());
+        }
         else
+        {
             services.AddSingleton<IDigitalTwinGateway, AzureDigitalTwinsGateway>();
+        }
 
         // Identity (JWT + hashing)
         services.Configure<JwtOptions>(config.GetSection("Jwt"));
