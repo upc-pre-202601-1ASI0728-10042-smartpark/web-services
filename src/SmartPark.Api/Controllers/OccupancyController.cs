@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartPark.Application.Abstractions;
 using SmartPark.Application.Contracts;
 using SmartPark.Application.ParkingOperations;
 
@@ -9,7 +10,10 @@ namespace SmartPark.Api.Controllers;
 [ApiController]
 [Authorize(Roles = "Operator")]
 [Route("api/v1/occupancy")]
-public sealed class OccupancyController(OccupancyQueryHandler occupancy, GetSpacesByZoneHandler spaces) : ControllerBase
+public sealed class OccupancyController(
+    OccupancyQueryHandler occupancy,
+    GetSpacesByZoneHandler spaces,
+    IServiceProvider services) : ControllerBase
 {
     [HttpGet("summary")]
     public async Task<IActionResult> Summary([FromQuery] string lotId = "LOT-JOCKEY", CancellationToken ct = default)
@@ -27,4 +31,18 @@ public sealed class OccupancyController(OccupancyQueryHandler occupancy, GetSpac
     [HttpGet("zones/{zoneId}/spaces")]
     public async Task<ActionResult<IReadOnlyList<ParkingSpaceDto>>> Spaces(string zoneId, CancellationToken ct = default)
         => Ok(await spaces.HandleAsync(new GetSpacesByZoneQuery(zoneId), ct));
+
+    /// <summary>
+    /// Simula entradas/salidas de vehículos (solo disponible con el gemelo de
+    /// demostración). Permite ver la ocupación cambiar en el panel y el 3D.
+    /// </summary>
+    [HttpPost("simulate")]
+    public IActionResult Simulate()
+    {
+        var simulator = services.GetService(typeof(IOccupancySimulator)) as IOccupancySimulator;
+        if (simulator is null)
+            return StatusCode(501, new { message = "La simulación de ocupación no está disponible en este entorno." });
+        simulator.SimulateTick();
+        return Accepted(new { simulated = true });
+    }
 }
