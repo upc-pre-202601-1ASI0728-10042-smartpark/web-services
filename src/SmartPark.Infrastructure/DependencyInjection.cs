@@ -19,8 +19,25 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        // Persistencia (PostgreSQL) + Unit of Work
-        services.AddDbContext<SmartParkDbContext>(opt => opt.UseNpgsql(config.GetConnectionString("SmartParkDb")));
+        // Persistencia + Unit of Work. Proveedor configurable: PostgreSQL (local/dev)
+        // o SQL Server (Azure SQL en la nube), según "Database:Provider".
+        var connectionString = config.GetConnectionString("SmartParkDb");
+        var provider = config["Database:Provider"] ?? "Postgres";
+        services.AddDbContext<SmartParkDbContext>(opt =>
+        {
+            switch (provider.ToLowerInvariant())
+            {
+                case "sqlserver":
+                    opt.UseSqlServer(connectionString);
+                    break;
+                case "sqlite":
+                    opt.UseSqlite(connectionString);
+                    break;
+                default:
+                    opt.UseNpgsql(connectionString);
+                    break;
+            }
+        });
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<SmartParkDbContext>());
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IIncidentRepository, IncidentRepository>();
