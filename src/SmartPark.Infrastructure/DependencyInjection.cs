@@ -44,9 +44,13 @@ public static class DependencyInjection
         services.AddScoped<IParkingSessionRepository, ParkingSessionRepository>();
         services.AddScoped<IDeviceTokenRepository, DeviceTokenRepository>();
 
-        // Digital Twin Synchronization (Anti-Corruption Layer)
+        // Digital Twin Synchronization (Anti-Corruption Layer).
+        // "Adt:Mode = Demo" usa un grafo sembrado (entornos sin ADT real).
         services.Configure<AdtOptions>(config.GetSection("Adt"));
-        services.AddSingleton<IDigitalTwinGateway, AzureDigitalTwinsGateway>();
+        if (string.Equals(config["Adt:Mode"], "Demo", StringComparison.OrdinalIgnoreCase))
+            services.AddSingleton<IDigitalTwinGateway, DemoDigitalTwinGateway>();
+        else
+            services.AddSingleton<IDigitalTwinGateway, AzureDigitalTwinsGateway>();
 
         // Identity (JWT + hashing)
         services.Configure<JwtOptions>(config.GetSection("Jwt"));
