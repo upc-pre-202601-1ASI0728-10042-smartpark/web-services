@@ -3,6 +3,7 @@ using SmartPark.Application.IdentityAccess;
 using SmartPark.Application.Notifications;
 using SmartPark.Application.ParkingOperations;
 using SmartPark.Application.SafetyIncident;
+using SmartPark.Domain.ParkingSession;
 
 namespace SmartPark.Application;
 
@@ -18,6 +19,13 @@ public static class DependencyInjection
         services.AddScoped<IngestSmokeAlertHandler>();
         services.AddScoped<GetActiveAlertsHandler>();
         services.AddScoped<RegisterDeviceTokenHandler>();
+
+        // Parking Session (Sprint 2)
+        services.AddSingleton<ParkingCostCalculator>();
+        services.AddScoped<StartParkingSessionHandler>();
+        services.AddScoped<RegisterVehicleLocationHandler>();
+        services.AddScoped<FinalizeParkingSessionHandler>();
+        services.AddScoped<GetSessionHistoryHandler>();
         return services;
     }
 }
