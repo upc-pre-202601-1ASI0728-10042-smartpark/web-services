@@ -26,6 +26,9 @@ public static class DependencyInjection
         services.AddScoped<RegisterVehicleLocationHandler>();
         services.AddScoped<FinalizeParkingSessionHandler>();
         services.AddScoped<GetSessionHistoryHandler>();
+
+        // Energy Efficiency (Sprint 2)
+        services.AddScoped<EnergyRecommendationHandler>();
         return services;
     }
 }
