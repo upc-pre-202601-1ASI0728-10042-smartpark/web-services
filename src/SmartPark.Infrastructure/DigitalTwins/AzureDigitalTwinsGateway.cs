@@ -17,19 +17,29 @@ namespace SmartPark.Infrastructure.DigitalTwins;
 public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
 {
     private const string M = "dtmi:com:apextwin:smartpark";
-    private readonly DigitalTwinsClient _client;
+    private readonly DigitalTwinsClient? _client;
+    private readonly bool _configured;
     private readonly ILogger<AzureDigitalTwinsGateway> _log;
 
     public AzureDigitalTwinsGateway(IOptions<AdtOptions> options, ILogger<AzureDigitalTwinsGateway> log)
     {
         _log = log;
         var host = options.Value.HostName;
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            // Sin ADT configurado: la aplicación opera en modo degradado.
+            _configured = false;
+            _log.LogWarning("Azure Digital Twins no configurado: operando en modo degradado.");
+            return;
+        }
         var uri = new Uri(host.StartsWith("http") ? host : $"https://{host}");
         _client = new DigitalTwinsClient(uri, new DefaultAzureCredential());
+        _configured = true;
     }
 
     public async Task<OccupancySummaryDto> GetLotOccupancyAsync(string lotId, CancellationToken ct = default)
     {
+        if (_client is null) return new OccupancySummaryDto(lotId, 0, 0, 0, DateTimeOffset.UtcNow);
         var twin = await _client.GetDigitalTwinAsync<BasicDigitalTwin>(lotId, ct);
         var c = twin.Value.Contents;
         return new OccupancySummaryDto(lotId, GetInt(c, "totalSpaces"), GetInt(c, "occupiedSpaces"), GetDouble(c, "occupancyRate"), DateTimeOffset.UtcNow);
@@ -37,6 +47,7 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
 
     public async Task<IReadOnlyList<ZoneOccupancyDto>> GetZonesAsync(int? levelNumber = null, CancellationToken ct = default)
     {
+        if (_client is null) return Array.Empty<ZoneOccupancyDto>();
         var q = $"SELECT * FROM digitaltwins T WHERE IS_OF_MODEL(T, '{M}:ParkingZone;1')";
         var result = new List<ZoneOccupancyDto>();
         await foreach (var t in _client.QueryAsync<BasicDigitalTwin>(q, ct))
@@ -51,6 +62,7 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
 
     public async Task<IReadOnlyList<ParkingSpaceDto>> GetSpacesByZoneAsync(string zoneId, CancellationToken ct = default)
     {
+        if (_client is null) return Array.Empty<ParkingSpaceDto>();
         var q = $"SELECT space FROM digitaltwins zone JOIN space RELATED zone.hasSpace WHERE zone.$dtId = '{zoneId}'";
         var result = new List<ParkingSpaceDto>();
         await foreach (var item in _client.QueryAsync<JsonElement>(q, ct))
@@ -64,6 +76,7 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
 
     public async Task<IReadOnlyList<SmokeAlertDto>> GetActiveSmokeAlertsAsync(CancellationToken ct = default)
     {
+        if (_client is null) return Array.Empty<SmokeAlertDto>();
         var q = $"SELECT * FROM digitaltwins T WHERE IS_OF_MODEL(T, '{M}:SmokeDetector;1') AND T.smokeDetected = true";
         var result = new List<SmokeAlertDto>();
         await foreach (var t in _client.QueryAsync<BasicDigitalTwin>(q, ct))
@@ -76,6 +89,7 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
 
     public async Task<IReadOnlyList<EnergyZoneDto>> GetEnergyRecommendationsAsync(CancellationToken ct = default)
     {
+        if (_client is null) return Array.Empty<EnergyZoneDto>();
         var q = $"SELECT * FROM digitaltwins T WHERE IS_OF_MODEL(T, '{M}:LightingZone;1')";
         var result = new List<EnergyZoneDto>();
         await foreach (var t in _client.QueryAsync<BasicDigitalTwin>(q, ct))
@@ -88,6 +102,7 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
 
     public async Task UpdateSmokeStateAsync(string detectorId, double smokeLevel, DateTimeOffset at, CancellationToken ct = default)
     {
+        if (_client is null) { _log.LogWarning("ADT no configurado: se omite la actualización del detector {Detector}.", detectorId); return; }
         // Aplica JSON Patch al twin del detector (idempotente).
         var patch = new JsonPatchDocument();
         patch.AppendReplace("/smokeDetected", true);
@@ -100,13 +115,14 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
 
     public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
     {
+        if (_client is null) return false;
         try
         {
             await foreach (var _ in _client.QueryAsync<BasicDigitalTwin>("SELECT TOP(1) * FROM digitaltwins", ct))
                 return true;
             return true;
         }
-        catch (RequestFailedException ex)
+        catch (Exception ex)
         {
             _log.LogError(ex, "ADT no disponible (modo degradado)");
             return false;
