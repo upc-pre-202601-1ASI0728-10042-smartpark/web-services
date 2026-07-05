@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SmartPark.Domain\SmartPark.Domain.csproj" />
+    <ProjectReference Include="..\..\src\SmartPark.Application\SmartPark.Application.csproj" />
   </ItemGroup>
 
 </Project>

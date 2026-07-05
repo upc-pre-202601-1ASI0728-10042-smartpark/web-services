@@ -19,6 +19,7 @@ public sealed class SmartParkDbContext(DbContextOptions<SmartParkDbContext> opti
     public DbSet<Incident> Incidents => Set<Incident>();
     public DbSet<ParkingSession> ParkingSessions => Set<ParkingSession>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
+    public DbSet<NotificationPreferences> NotificationPreferences => Set<NotificationPreferences>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(SmartParkDbContext).Assembly);
