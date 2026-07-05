@@ -19,7 +19,17 @@ public sealed class EnergyRecommendationHandler(IDigitalTwinGateway gw)
         return zones.Select(z =>
         {
             var rec = LightingRecommendation.FromOccupancy(z.OccupancyRate);
-            return new EnergyZoneDto($"LIGHT-{z.ZoneId}", rec.CurrentLevel, rec.RecommendedLevel, rec.SavingsPercent, rec.Status);
+            return new EnergyZoneDto(
+                z.ZoneId,
+                z.Code,
+                z.LevelNumber,
+                z.OccupiedSpaces,
+                z.TotalSpaces,
+                z.OccupancyRate,
+                rec.CurrentLightingLevel,
+                rec.RecommendedLightingLevel,
+                rec.EstimatedSavingsKwh,
+                rec.Action);
         }).ToList();
     }
 }
