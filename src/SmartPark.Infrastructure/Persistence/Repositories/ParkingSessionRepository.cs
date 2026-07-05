@@ -30,5 +30,8 @@ public sealed class ParkingSessionRepository(SmartParkDbContext db) : IParkingSe
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ParkingSession>> GetAllAsync(CancellationToken ct = default)
+        => await db.ParkingSessions.ToListAsync(ct);
+
     public void Add(ParkingSession session) => db.ParkingSessions.Add(session);
 }

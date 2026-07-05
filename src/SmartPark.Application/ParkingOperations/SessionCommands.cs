@@ -10,6 +10,14 @@ public record StartParkingSessionCommand(Guid DriverId);
 public record RegisterVehicleLocationCommand(Guid SessionId, Guid DriverId, string SpaceId);
 public record FinalizeParkingSessionCommand(Guid SessionId, Guid DriverId);
 public record GetSessionHistoryQuery(Guid DriverId);
+public record GetSessionSummaryQuery();
+public record GetActiveSessionQuery(Guid DriverId);
+
+/// <summary>Identificador del único lote de estacionamiento gestionado por SmartPark.</summary>
+internal static class ParkingLot
+{
+    public const string Id = "LOT-SP-01";
+}
 
 /// <summary>
 /// Caso de uso: inicia una sesión de estacionamiento (ingreso del vehículo) para el
@@ -89,5 +97,58 @@ public sealed class GetSessionHistoryHandler(IParkingSessionRepository sessions)
             s.AccumulatedCost.Amount,
             s.AccumulatedCost.Currency,
             s.IsActive)).ToList();
+    }
+}
+
+/// <summary>
+/// Caso de uso: resumen de flujo de vehículos del lote para el panel del operador
+/// (sesiones activas, ingresos/salidas de la última hora y duración media).
+/// </summary>
+public sealed class GetSessionSummaryHandler(IParkingSessionRepository sessions)
+{
+    public async Task<SessionSummaryDto> HandleAsync(GetSessionSummaryQuery q, CancellationToken ct = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var since = now.AddMinutes(-60);
+        var all = await sessions.GetAllAsync(ct);
+
+        var activeSessions = all.Count(s => s.EndedAt is null);
+        var entriesLastHour = all.Count(s => s.StartedAt >= since);
+        var exitsLastHour = all.Count(s => s.EndedAt is not null && s.EndedAt.Value >= since);
+
+        var finalized = all.Where(s => s.EndedAt is not null).ToList();
+        var averageDurationMinutes = finalized.Count == 0
+            ? 0
+            : Math.Round(finalized.Average(s => (s.EndedAt!.Value - s.StartedAt).TotalMinutes), 2);
+
+        return new SessionSummaryDto(
+            ParkingLot.Id, activeSessions, entriesLastHour, exitsLastHour, averageDurationMinutes, now);
+    }
+}
+
+/// <summary>
+/// Caso de uso: sesión de estacionamiento activa del conductor autenticado. Devuelve
+/// <c>null</c> si el conductor no tiene ninguna sesión abierta.
+/// </summary>
+public sealed class GetActiveSessionHandler(IParkingSessionRepository sessions)
+{
+    public async Task<SessionDto?> HandleAsync(GetActiveSessionQuery q, CancellationToken ct = default)
+    {
+        var s = await sessions.GetActiveByDriverAsync(q.DriverId, ct);
+        if (s is null) return null;
+
+        var reference = s.EndedAt ?? DateTimeOffset.UtcNow;
+        return new SessionDto(
+            s.Id.ToString(),
+            Plate: null,
+            ZoneId: null,
+            ZoneCode: null,
+            SpaceCode: s.VehicleLocation?.SpaceId,
+            LotId: ParkingLot.Id,
+            Status: s.IsActive ? "Active" : "Finalized",
+            StartedAt: s.StartedAt,
+            EndedAt: s.EndedAt,
+            DurationMinutes: (int)Math.Max(0, (reference - s.StartedAt).TotalMinutes),
+            AccumulatedCost: s.AccumulatedCost.Amount);
     }
 }
