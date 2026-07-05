@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IIncidentRepository, IncidentRepository>();
         services.AddScoped<IParkingSessionRepository, ParkingSessionRepository>();
         services.AddScoped<IDeviceTokenRepository, DeviceTokenRepository>();
+        services.AddScoped<INotificationPreferencesRepository, NotificationPreferencesRepository>();
 
         // Digital Twin Synchronization (Anti-Corruption Layer).
         // "Adt:Mode = Demo" usa un grafo sembrado (entornos sin ADT real).

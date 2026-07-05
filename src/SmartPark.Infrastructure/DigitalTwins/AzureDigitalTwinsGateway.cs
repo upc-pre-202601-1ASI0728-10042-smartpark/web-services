@@ -87,19 +87,6 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
         return result;
     }
 
-    public async Task<IReadOnlyList<EnergyZoneDto>> GetEnergyRecommendationsAsync(CancellationToken ct = default)
-    {
-        if (_client is null) return Array.Empty<EnergyZoneDto>();
-        var q = $"SELECT * FROM digitaltwins T WHERE IS_OF_MODEL(T, '{M}:LightingZone;1')";
-        var result = new List<EnergyZoneDto>();
-        await foreach (var t in _client.QueryAsync<BasicDigitalTwin>(q, ct))
-        {
-            var c = t.Contents;
-            result.Add(new EnergyZoneDto(t.Id, GetDouble(c, "currentLevel"), GetDouble(c, "recommendedLevel"), GetDouble(c, "savingsPercent"), GetString(c, "status", "Optimal")));
-        }
-        return result;
-    }
-
     public async Task UpdateSmokeStateAsync(string detectorId, double smokeLevel, DateTimeOffset at, CancellationToken ct = default)
     {
         if (_client is null) { _log.LogWarning("ADT no configurado: se omite la actualización del detector {Detector}.", detectorId); return; }

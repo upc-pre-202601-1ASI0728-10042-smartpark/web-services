@@ -129,13 +129,6 @@ public sealed class DemoDigitalTwinGateway : IDigitalTwinGateway, IOccupancySimu
         }
     }
 
-    public Task<IReadOnlyList<EnergyZoneDto>> GetEnergyRecommendationsAsync(CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<EnergyZoneDto>>(_zones
-            .Select(z => new EnergyZoneDto($"LIGHT-{z.Id}", 100,
-                z.Spaces.Any(IsTaken) ? 100 : 55,
-                z.Spaces.Any(IsTaken) ? 0 : 45, z.Spaces.Any(IsTaken) ? "Optimal" : "Optimizable"))
-            .ToList());
-
     public Task UpdateSmokeStateAsync(string detectorId, double smokeLevel, DateTimeOffset at, CancellationToken ct = default)
     {
         lock (_lock)

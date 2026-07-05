@@ -12,5 +12,11 @@ public sealed class IncidentRepository(SmartParkDbContext db) : IIncidentReposit
     public Task<Incident?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => db.Incidents.SingleOrDefaultAsync(i => i.Id == id, ct);
 
+    public Task<Incident?> GetLatestActiveByDetectorAsync(string detectorId, CancellationToken ct = default)
+        => db.Incidents
+            .Where(i => i.DetectorId == detectorId && i.Status != IncidentStatus.Resolved)
+            .OrderByDescending(i => i.DetectedAt)
+            .FirstOrDefaultAsync(ct);
+
     public void Add(Incident incident) => db.Incidents.Add(incident);
 }

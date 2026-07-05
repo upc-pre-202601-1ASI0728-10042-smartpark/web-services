@@ -19,3 +19,30 @@ public record SessionHistoryItemDto(
     decimal Cost,
     string Currency,
     bool IsActive);
+
+/// <summary>
+/// Resumen de flujo de vehículos del lote para el panel del operador (Web App).
+/// </summary>
+public record SessionSummaryDto(
+    string LotId,
+    int ActiveSessions,
+    int EntriesLastHour,
+    int ExitsLastHour,
+    double AverageDurationMinutes,
+    DateTimeOffset AsOf);
+
+/// <summary>
+/// Sesión de estacionamiento activa del conductor autenticado (Mobile App / Web App).
+/// </summary>
+public record SessionDto(
+    string SessionId,
+    string? Plate,
+    string? ZoneId,
+    string? ZoneCode,
+    string? SpaceCode,
+    string? LotId,
+    string Status,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    int DurationMinutes,
+    decimal AccumulatedCost);

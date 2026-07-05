@@ -10,41 +10,48 @@ namespace SmartPark.Domain.EnergyEfficiency;
 /// </summary>
 public sealed class LightingRecommendation : ValueObject
 {
-    /// <summary>Umbral de ocupación por debajo del cual se recomienda atenuar (30 %).</summary>
-    public const double LowOccupancyThreshold = 0.30;
+    /// <summary>Umbral de ocupación por debajo del cual se recomienda atenuar (35 %).</summary>
+    public const double LowOccupancyThreshold = 0.35;
 
-    public double CurrentLevel { get; }
-    public double RecommendedLevel { get; }
-    public double SavingsPercent { get; }
-    public string Status { get; }
+    /// <summary>Nivel de iluminación de referencia de una zona a pleno (100 %).</summary>
+    public const int FullLightingLevel = 100;
 
-    private LightingRecommendation(double currentLevel, double recommendedLevel, string status)
+    /// <summary>Consumo base de referencia por zona (kWh/h) usado para estimar el ahorro.</summary>
+    public const double BaseKwhPerHour = 2.5;
+
+    public int CurrentLightingLevel { get; }
+    public int RecommendedLightingLevel { get; }
+    public double EstimatedSavingsKwh { get; }
+    public string Action { get; }
+
+    private LightingRecommendation(int recommendedLightingLevel, string action)
     {
-        CurrentLevel = currentLevel;
-        RecommendedLevel = recommendedLevel;
-        SavingsPercent = Math.Round(currentLevel - recommendedLevel, 2);
-        Status = status;
+        CurrentLightingLevel = FullLightingLevel;
+        RecommendedLightingLevel = recommendedLightingLevel;
+        Action = action;
+        EstimatedSavingsKwh = Math.Round(
+            (CurrentLightingLevel - RecommendedLightingLevel) / 100.0 * BaseKwhPerHour, 2);
     }
 
     /// <summary>
     /// Deriva la recomendación a partir de la tasa de ocupación (0..1) de la zona.
-    /// Zona vacía → reducir a mínimo de seguridad; ocupación baja → atenuar; en otro
+    /// Zona vacía → apagar al mínimo de seguridad; ocupación baja → atenuar; en otro
     /// caso → mantener al 100 %.
     /// </summary>
     public static LightingRecommendation FromOccupancy(double occupancyRate, double lowOccupancyThreshold = LowOccupancyThreshold)
     {
         if (occupancyRate < 0) occupancyRate = 0;
         if (occupancyRate <= 0.0001)
-            return new LightingRecommendation(100, 20, "ReduceToStandby");
+            return new LightingRecommendation(10, "Off");
         if (occupancyRate < lowOccupancyThreshold)
-            return new LightingRecommendation(100, 50, "Dim");
-        return new LightingRecommendation(100, 100, "Optimal");
+            return new LightingRecommendation(50, "Dim");
+        return new LightingRecommendation(FullLightingLevel, "Maintain");
     }
 
     protected override IEnumerable<object?> GetEqualityComponents()
     {
-        yield return CurrentLevel;
-        yield return RecommendedLevel;
-        yield return Status;
+        yield return CurrentLightingLevel;
+        yield return RecommendedLightingLevel;
+        yield return Action;
     }
 }
