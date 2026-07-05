@@ -13,6 +13,8 @@ namespace SmartPark.Api.Controllers;
 public sealed class SmokeAlertsController(
     IngestSmokeAlertHandler ingest,
     GetActiveAlertsHandler active,
+    AcknowledgeSmokeAlertHandler acknowledge,
+    ResolveSmokeAlertHandler resolve,
     IHubContext<AlertsHub> hub,
     IConfiguration config) : ControllerBase
 {
@@ -23,6 +25,22 @@ public sealed class SmokeAlertsController(
     [Authorize(Roles = "Operator")]
     public async Task<ActionResult<IReadOnlyList<SmokeAlertDto>>> Active(CancellationToken ct = default)
         => Ok(await active.HandleAsync(new GetActiveAlertsQuery(), ct));
+
+    /// <summary>El operador toma conocimiento (confirma) del incidente activo del detector.</summary>
+    [HttpPost("{detectorId}/acknowledge")]
+    [Authorize(Roles = "Operator")]
+    public async Task<IActionResult> Acknowledge(string detectorId, CancellationToken ct = default)
+        => await acknowledge.HandleAsync(new AcknowledgeSmokeAlertCommand(detectorId), ct)
+            ? NoContent()
+            : NotFound(new { message = "No hay un incidente de humo activo para el detector indicado." });
+
+    /// <summary>El operador cierra (resuelve) el incidente activo del detector.</summary>
+    [HttpPost("{detectorId}/resolve")]
+    [Authorize(Roles = "Operator")]
+    public async Task<IActionResult> Resolve(string detectorId, CancellationToken ct = default)
+        => await resolve.HandleAsync(new ResolveSmokeAlertCommand(detectorId), ct)
+            ? NoContent()
+            : NotFound(new { message = "No hay un incidente de humo activo para el detector indicado." });
 
     /// <summary>
     /// Ingesta de alerta de humo desde el simulador IoT o un sensor real.
