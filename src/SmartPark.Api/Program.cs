@@ -13,8 +13,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Web: MVC + SignalR + OpenAPI
-builder.Services.AddControllers();
+// Web: MVC + SignalR + OpenAPI. Se omiten propiedades null en el JSON para que el
+// custom connector de Power Apps (Swagger 2.0, sin 'nullable') no falle al parsear
+// respuestas con campos ausentes (p. ej. endedAt/plate en una sesión activa).
+builder.Services.AddControllers().AddJsonOptions(o =>
+    o.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull);
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -23,11 +26,29 @@ builder.Services.AddSwaggerGen(c =>
 // Autenticacion JWT
 var jwt = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
+    .AddJwtBearer(o =>
     {
-        ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true,
-        ValidIssuer = jwt["Issuer"], ValidAudience = jwt["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"] ?? "")),
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true,
+            ValidIssuer = jwt["Issuer"], ValidAudience = jwt["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"] ?? "")),
+        };
+        // Power Apps reserva el header Authorization para la autenticación de la conexión,
+        // por lo que la Mobile App (custom connector) envía el token del conductor en el
+        // header alterno X-Auth-Token. El Web App sigue usando Authorization: Bearer.
+        o.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var custom = ctx.Request.Headers["X-Auth-Token"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(custom))
+                    ctx.Token = custom.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                        ? custom["Bearer ".Length..].Trim()
+                        : custom.Trim();
+                return Task.CompletedTask;
+            }
+        };
     });
 builder.Services.AddAuthorization();
 

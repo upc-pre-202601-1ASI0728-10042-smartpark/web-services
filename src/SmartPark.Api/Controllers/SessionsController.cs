@@ -23,6 +23,7 @@ public sealed class SessionsController(
     GetActiveSessionHandler activeSession) : ControllerBase
 {
     public record RegisterLocationRequest(string SpaceId);
+    public record StartSessionRequest(string? Plate, string? ZoneId, string? SpaceId, string? LotId);
 
     private Guid DriverId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
@@ -44,11 +45,11 @@ public sealed class SessionsController(
     /// <summary>Inicia una sesión de estacionamiento (ingreso del vehículo).</summary>
     [HttpPost]
     [Authorize(Roles = "Driver")]
-    public async Task<IActionResult> Start(CancellationToken ct)
+    public async Task<IActionResult> Start([FromBody] StartSessionRequest? req, CancellationToken ct)
     {
         try
         {
-            var id = await start.HandleAsync(new StartParkingSessionCommand(DriverId), ct);
+            var id = await start.HandleAsync(new StartParkingSessionCommand(DriverId, req?.Plate, req?.SpaceId, req?.ZoneId), ct);
             return Created($"/api/v1/sessions/{id}", new { sessionId = id });
         }
         catch (DomainException ex)

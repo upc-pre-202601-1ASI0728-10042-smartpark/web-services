@@ -116,6 +116,27 @@ public sealed class DemoDigitalTwinGateway : IDigitalTwinGateway, IOccupancySimu
         }
     }
 
+    public Task SetSpaceOccupancyAsync(string? zoneId, string spaceCode, bool occupied, CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            var candidates = _zones.SelectMany(z => z.Spaces)
+                .Where(s => string.Equals(s.Code, spaceCode, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(zoneId))
+                candidates = candidates.Where(s => string.Equals(s.ZoneId, zoneId, StringComparison.OrdinalIgnoreCase));
+            // Al liberar, priorizar una plaza que esté ocupada (por si el código se repite entre niveles).
+            var space = occupied
+                ? candidates.FirstOrDefault()
+                : (candidates.FirstOrDefault(s => IsTaken(s)) ?? candidates.FirstOrDefault());
+            if (space is not null)
+            {
+                space.State = occupied ? "Occupied" : "Free";
+                space.Updated = DateTimeOffset.UtcNow;
+            }
+        }
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<SmokeAlertDto>> GetActiveSmokeAlertsAsync(CancellationToken ct = default)
     {
         lock (_lock)

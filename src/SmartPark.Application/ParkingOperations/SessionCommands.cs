@@ -6,7 +6,7 @@ using PSession = SmartPark.Domain.ParkingSession.ParkingSession;
 
 namespace SmartPark.Application.ParkingOperations;
 
-public record StartParkingSessionCommand(Guid DriverId);
+public record StartParkingSessionCommand(Guid DriverId, string? Plate = null, string? SpaceId = null, string? ZoneId = null);
 public record RegisterVehicleLocationCommand(Guid SessionId, Guid DriverId, string SpaceId);
 public record FinalizeParkingSessionCommand(Guid SessionId, Guid DriverId);
 public record GetSessionHistoryQuery(Guid DriverId);
@@ -23,16 +23,19 @@ internal static class ParkingLot
 /// Caso de uso: inicia una sesión de estacionamiento (ingreso del vehículo) para el
 /// conductor autenticado. Un conductor no puede tener dos sesiones activas a la vez.
 /// </summary>
-public sealed class StartParkingSessionHandler(IParkingSessionRepository sessions, IUnitOfWork uow)
+public sealed class StartParkingSessionHandler(IParkingSessionRepository sessions, IUnitOfWork uow, IDigitalTwinGateway twins)
 {
     public async Task<Guid> HandleAsync(StartParkingSessionCommand cmd, CancellationToken ct = default)
     {
         if (await sessions.GetActiveByDriverAsync(cmd.DriverId, ct) is not null)
             throw new DomainException("El conductor ya tiene una sesión de estacionamiento activa.");
 
-        var session = PSession.Start(cmd.DriverId);
+        var session = PSession.Start(cmd.DriverId, cmd.Plate, cmd.SpaceId);
         sessions.Add(session);
         await uow.SaveChangesAsync(ct);
+        // Refleja el ingreso del vehículo en la ocupación del gemelo (baja la disponibilidad).
+        if (!string.IsNullOrWhiteSpace(cmd.SpaceId))
+            await twins.SetSpaceOccupancyAsync(cmd.ZoneId, cmd.SpaceId, true, ct);
         return session.Id;
     }
 }
@@ -59,7 +62,8 @@ public sealed class RegisterVehicleLocationHandler(IParkingSessionRepository ses
 public sealed class FinalizeParkingSessionHandler(
     IParkingSessionRepository sessions,
     ParkingCostCalculator calculator,
-    IUnitOfWork uow)
+    IUnitOfWork uow,
+    IDigitalTwinGateway twins)
 {
     public async Task<SessionReceiptDto> HandleAsync(FinalizeParkingSessionCommand cmd, CancellationToken ct = default)
     {
@@ -73,6 +77,9 @@ public sealed class FinalizeParkingSessionHandler(
         var cost = calculator.Calculate(session.StartedAt, DateTimeOffset.UtcNow);
         session.Finalize(cost);
         await uow.SaveChangesAsync(ct);
+        // Libera la plaza en la ocupación del gemelo (sube la disponibilidad).
+        if (session.VehicleLocation is not null)
+            await twins.SetSpaceOccupancyAsync(null, session.VehicleLocation.SpaceId, false, ct);
 
         var endedAt = session.EndedAt!.Value;
         return new SessionReceiptDto(
@@ -140,7 +147,7 @@ public sealed class GetActiveSessionHandler(IParkingSessionRepository sessions)
         var reference = s.EndedAt ?? DateTimeOffset.UtcNow;
         return new SessionDto(
             s.Id.ToString(),
-            Plate: null,
+            Plate: s.Plate,
             ZoneId: null,
             ZoneCode: null,
             SpaceCode: s.VehicleLocation?.SpaceId,

@@ -12,10 +12,14 @@ public sealed class ParkingSessionRepository(SmartParkDbContext db) : IParkingSe
         => db.ParkingSessions.SingleOrDefaultAsync(s => s.Id == id, ct);
 
     public async Task<IReadOnlyList<ParkingSession>> GetByDriverAsync(Guid driverId, CancellationToken ct = default)
-        => await db.ParkingSessions
+    {
+        // SQLite no soporta ORDER BY sobre DateTimeOffset; se ordena en cliente
+        // (LINQ to Objects) tras materializar, manteniendo compatibilidad multi-proveedor.
+        var list = await db.ParkingSessions
             .Where(s => s.DriverId == driverId)
-            .OrderByDescending(s => s.StartedAt)
             .ToListAsync(ct);
+        return list.OrderByDescending(s => s.StartedAt).ToList();
+    }
 
     public async Task<IReadOnlyList<ParkingSession>> GetActiveByLocationsAsync(IEnumerable<string> spaceIds, CancellationToken ct = default)
     {

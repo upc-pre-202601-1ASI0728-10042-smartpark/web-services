@@ -10,6 +10,7 @@ namespace SmartPark.Domain.ParkingSession;
 public sealed class ParkingSession : AggregateRoot<Guid>
 {
     public Guid DriverId { get; private set; }
+    public string? Plate { get; private set; }
     public VehicleLocation? VehicleLocation { get; private set; }
     public DateTimeOffset StartedAt { get; private set; }
     public DateTimeOffset? EndedAt { get; private set; }
@@ -25,11 +26,17 @@ public sealed class ParkingSession : AggregateRoot<Guid>
         StartedAt = DateTimeOffset.UtcNow;
     }
 
-    /// <summary>Factory: inicia una sesión de estacionamiento para un conductor.</summary>
-    public static ParkingSession Start(Guid driverId)
+    /// <summary>
+    /// Factory: inicia una sesión de estacionamiento para un conductor. Opcionalmente
+    /// registra la placa y la plaza elegida (ingreso directo desde la app móvil).
+    /// </summary>
+    public static ParkingSession Start(Guid driverId, string? plate = null, string? spaceId = null)
     {
         if (driverId == Guid.Empty) throw new DomainException("DriverId es obligatorio.");
         var session = new ParkingSession(Guid.NewGuid(), driverId);
+        session.Plate = string.IsNullOrWhiteSpace(plate) ? null : plate.Trim().ToUpperInvariant();
+        if (!string.IsNullOrWhiteSpace(spaceId))
+            session.VehicleLocation = VehicleLocation.Of(spaceId);
         session.Raise(new ParkingSessionStarted(session.Id, driverId));
         return session;
     }

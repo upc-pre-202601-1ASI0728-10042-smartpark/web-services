@@ -100,6 +100,22 @@ public sealed class AzureDigitalTwinsGateway : IDigitalTwinGateway
         _log.LogWarning("Estado de humo actualizado en {Detector}: {Level} ppm", detectorId, smokeLevel);
     }
 
+    public async Task SetSpaceOccupancyAsync(string? zoneId, string spaceCode, bool occupied, CancellationToken ct = default)
+    {
+        if (_client is null || string.IsNullOrWhiteSpace(zoneId)) return;
+        // Deriva el twin de la plaza (p. ej. ZONE-L1-A + "A01" -> SPACE-L1-A01) y refleja la ocupación.
+        var level = zoneId.Split('-').ElementAtOrDefault(1) ?? "L1";
+        var twinId = $"SPACE-{level}-{spaceCode}";
+        try
+        {
+            var patch = new JsonPatchDocument();
+            patch.AppendReplace("/occupancyState", occupied ? "Occupied" : "Free");
+            patch.AppendReplace("/lastUpdated", DateTimeOffset.UtcNow.UtcDateTime);
+            await _client.UpdateDigitalTwinAsync(twinId, patch, cancellationToken: ct);
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "No se pudo actualizar la ocupación de {Twin}.", twinId); }
+    }
+
     public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
     {
         if (_client is null) return false;
