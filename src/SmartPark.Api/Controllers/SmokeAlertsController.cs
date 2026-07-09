@@ -20,9 +20,10 @@ public sealed class SmokeAlertsController(
 {
     private const string ApiKeyHeader = "X-Api-Key";
 
-    /// <summary>Lista de alertas de humo activas (panel de seguridad del operador).</summary>
+    /// <summary>Lista de alertas de humo activas. La consulta el operador (panel de
+    /// seguridad) y también el conductor, que recibe y revisa alertas desde la app.</summary>
     [HttpGet]
-    [Authorize(Roles = "Operator")]
+    [Authorize(Roles = "Operator,Driver")]
     public async Task<ActionResult<IReadOnlyList<SmokeAlertDto>>> Active(CancellationToken ct = default)
         => Ok(await active.HandleAsync(new GetActiveAlertsQuery(), ct));
 

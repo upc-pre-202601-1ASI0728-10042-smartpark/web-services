@@ -9,3 +9,6 @@ TestResults/
 
 publish-azure/
 api.zip
+publish/
+publish.zip
+*.db

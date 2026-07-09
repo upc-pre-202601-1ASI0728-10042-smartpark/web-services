@@ -8,7 +8,7 @@ namespace SmartPark.Api.Controllers;
 
 /// <summary>Endpoints de ocupación (TS-01). Bounded Context: Parking Operations Monitoring.</summary>
 [ApiController]
-[Authorize(Roles = "Operator")]
+[Authorize]
 [Route("api/v1/occupancy")]
 public sealed class OccupancyController(
     OccupancyQueryHandler occupancy,
@@ -16,6 +16,7 @@ public sealed class OccupancyController(
     IServiceProvider services) : ControllerBase
 {
     [HttpGet("summary")]
+    [Authorize(Roles = "Operator")]
     public async Task<IActionResult> Summary([FromQuery] string lotId = "LOT-JOCKEY", CancellationToken ct = default)
     {
         var result = await occupancy.GetSummaryAsync(new GetOccupancySummaryQuery(lotId), ct);
@@ -24,11 +25,15 @@ public sealed class OccupancyController(
         return Ok(result.Summary);
     }
 
+    /// <summary>Disponibilidad por zona. Lectura compartida: el operador la usa en el
+    /// panel y el conductor la consulta desde la app para elegir dónde estacionar.</summary>
     [HttpGet("zones")]
+    [Authorize(Roles = "Operator,Driver")]
     public async Task<ActionResult<IReadOnlyList<ZoneOccupancyDto>>> Zones([FromQuery] int? level = null, CancellationToken ct = default)
         => Ok(await occupancy.GetZonesAsync(new GetZonesQuery(level), ct));
 
     [HttpGet("zones/{zoneId}/spaces")]
+    [Authorize(Roles = "Operator,Driver")]
     public async Task<ActionResult<IReadOnlyList<ParkingSpaceDto>>> Spaces(string zoneId, CancellationToken ct = default)
         => Ok(await spaces.HandleAsync(new GetSpacesByZoneQuery(zoneId), ct));
 
@@ -37,6 +42,7 @@ public sealed class OccupancyController(
     /// demostración). Permite ver la ocupación cambiar en el panel y el 3D.
     /// </summary>
     [HttpPost("simulate")]
+    [Authorize(Roles = "Operator")]
     public IActionResult Simulate()
     {
         var simulator = services.GetService(typeof(IOccupancySimulator)) as IOccupancySimulator;
